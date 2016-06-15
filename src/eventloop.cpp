@@ -4,37 +4,36 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <deque>
+#include <memory>
 
 #include "eventloop.hpp"
 #include "services/command.hpp"
 #include "utils/io.hpp"
 #include "utils/macros.hpp"
+#include "interfaces/lemonbar.hpp"
 
-EventLoop::EventLoop(std::string input_pipe)
-  : bar(get_bar()),
-    registry(std::make_shared<Registry>()),
-    logger(get_logger()),
-    state(STATE_STOPPED),
-    pipe_filename(input_pipe)
+EventLoop::EventLoop(bool write_stdout)
+  : bar(std::make_unique<Bar>())
+  , registry(std::make_shared<Registry>())
+  , logger(get_logger())
+  , state(STATE_STOPPED)
+  , write_stdout(write_stdout)
 {
-  if (this->pipe_filename.empty())
-    return;
-  if (io::file::is_fifo(this->pipe_filename))
-    return;
-  if (io::file::exists(this->pipe_filename))
-    unlink(this->pipe_filename.c_str());
-  if (mkfifo(this->pipe_filename.c_str(), 0600) == -1)
-    throw EventLoopTerminate(StrErrno());
+  if (!this->write_stdout) {
+    this->lemonbar = std::make_unique<lemonbar::Lemonbar>(*this->bar->opts.get());
+    this->fd_stdin = this->lemonbar->get_stdout(PIPE_READ);
+    this->fd_stdout = this->lemonbar->get_stdin(PIPE_WRITE);
+  }
 }
 
 bool EventLoop::running()
 {
-  return this->state() == STATE_STARTED;
+  return this->state == STATE_STARTED;
 }
 
 void EventLoop::start()
 {
-  if (this->state() == STATE_STARTED)
+  if (this->state == STATE_STARTED)
     return;
 
   this->logger->debug("Starting event loop...");
@@ -46,6 +45,9 @@ void EventLoop::start()
     this->stdin_subs.emplace_back(module_name);
   });
 
+  if (this->lemonbar)
+    this->lemonbar->start();
+
   this->state = STATE_STARTED;
 
   this->t_write = std::thread(&EventLoop::loop_write, this);
@@ -56,17 +58,19 @@ void EventLoop::start()
 
 void EventLoop::stop()
 {
-  if (this->state() == STATE_STOPPED)
+  if (this->state == STATE_STOPPED)
     return;
 
   this->logger->debug("Stopping event loop...");
 
   this->state = STATE_STOPPED;
 
-  // break the input read block - totally how it's meant to be done!
-  if (!this->pipe_filename.empty()) {
-    int status  = std::system(("echo >"+this->pipe_filename).c_str());
-    log_trace(std::to_string(status));
+  if (this->lemonbar) {
+    this->lemonbar->stop();
+
+    io::interrupt_read(this->lemonbar->get_stdout(PIPE_WRITE));
+  } else {
+    io::interrupt_read(this->fd_stdin);
   }
 
   this->registry->unload();
@@ -138,7 +142,10 @@ void EventLoop::loop_write()
           continue;
       }
 
-      this->write_stdout();
+      if (this->write_stdout)
+        io::writeline(STDOUT_FILENO, this->bar->get_output());
+      else
+        this->lemonbar->set_content(this->bar->get_output());
     } catch (Exception &e) {
       this->logger->error(e.what());
 
@@ -153,21 +160,10 @@ void EventLoop::loop_write()
 
 void EventLoop::loop_read()
 {
-  while (!this->pipe_filename.empty() && this->running()) {
-    try {
-      if ((this->fd_stdin = ::open(this->pipe_filename.c_str(), O_RDONLY)) == -1)
-        throw EventLoopTerminate(StrErrno());
-
+  while (this->running() && (this->write_stdout || (this->lemonbar && this->lemonbar->running()))) {
+    if (io::poll_read(this->fd_stdin))
       this->read_stdin();
-    } catch (Exception &e) {
-      this->logger->error(e.what());
-      return;
-    }
-  }
-
-  if (!this->pipe_filename.empty()) {
-    close(this->fd_stdin);
-    unlink(this->pipe_filename.c_str());
+    std::this_thread::sleep_for(25ms);
   }
 }
 
@@ -208,27 +204,19 @@ void EventLoop::read_stdin()
   }
 }
 
-void EventLoop::write_stdout()
-{
-  if (!this->registry->ready())
-    return;
-
-  try {
-    auto data = this->bar->get_output();
-
-    if (!this->running())
-      return;
-
-    if (dprintf(this->fd_stdout, "%s\n", data.c_str()) == -1)
-      throw EventLoopTerminate("Failed to write to stdout");
-  } catch (RegistryError &e) {
-    this->logger->error(e.what());
-  }
-}
-
 void EventLoop::cleanup(int timeout_ms)
 {
   this->logger->debug("Cleaning up...");
+
+  // Terminate forked processes
+  if (!this->pids.empty()) {
+    this->logger->info("Terminating "+ IntToStr(this->pids.size()) +" spawned process"+ (this->pids.size() > 1 ? "es" : ""));
+
+    for (auto &&pid : this->pids) {
+      proc::kill(pid, SIGKILL);
+      proc::wait_for_completion(pid);
+    }
+  }
 
   std::atomic<bool> t_read_joined(false);
   std::atomic<bool> t_write_joined(false);
@@ -269,4 +257,16 @@ void EventLoop::cleanup(int timeout_ms)
     t_timeout.join();
   else
     this->logger->debug("Timeout thread not joinable");
+}
+
+void EventLoop::register_forked_pid(pid_t pid)
+{
+  std::lock_guard<std::mutex> lck(this->pid_mtx);
+  this->pids.emplace_back(pid);
+}
+
+void EventLoop::unregister_forked_pid(pid_t pid)
+{
+  std::lock_guard<std::mutex> lck(this->pid_mtx);
+  this->pids.erase(std::remove(this->pids.begin(), this->pids.end(), pid), this->pids.end());
 }

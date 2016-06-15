@@ -143,7 +143,7 @@ std::string WirelessNetwork::get_essid()
   if (ioctl(this->fd, SIOCGIWESSID, &this->iw) == -1)
     throw WirelessNetworkException(StrErrno());
 
-  return string::trim(essid, ' ');
+  return string::trim(std::string(essid), ' ');
 }
 
 float WirelessNetwork::get_signal_quality()

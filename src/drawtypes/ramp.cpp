@@ -14,14 +14,18 @@ namespace drawtypes
     else
       icons = config::get_list<std::string>(config_path, ramp_name, {});
 
+    auto foreground = config::get<std::string>(config_path, ramp_name+"-foreground", "");
     auto n_icons = icons.size();
     repeat(n_icons)
     {
       auto ramp = ramp_name +"-"+ std::to_string(repeat_i_rev(n_icons));
-      vec.emplace_back(std::unique_ptr<Icon> { get_optional_config_icon(config_path, ramp, icons[repeat_i_rev(n_icons)]) });
+      auto icon = get_optional_config_icon(config_path, ramp, icons[repeat_i_rev(n_icons)]);
+      if (icon->fg.empty() && !foreground.empty())
+        icon->fg = foreground;
+      vec.emplace_back(std::move(icon));
     }
 
-    return std::unique_ptr<Ramp> { new Ramp(std::move(vec)) };
+    return std::make_unique<Ramp>(std::move(vec));
   }
 
   Ramp::Ramp(std::vector<std::unique_ptr<Icon>> icons) {
@@ -37,6 +41,6 @@ namespace drawtypes
   }
 
   std::unique_ptr<Icon> &Ramp::get_by_percentage(float percentage) {
-    return this->icons[(int)(percentage * (this->icons.size() - 1) / 100.0 + 0.5)];
+    return this->icons[(int)(percentage * (this->icons.size() - 1) / 100.0f + 0.5f)];
   }
 }

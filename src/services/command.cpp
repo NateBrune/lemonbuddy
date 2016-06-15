@@ -136,6 +136,7 @@ void Command::tail(std::function<void(std::string)> callback) {
 }
 
 int Command::writeline(std::string data) {
+  std::lock_guard<concurrency::SpinLock> lck(this->get_pipe_lock());
   return io::writeline(this->fd_stdin[PIPE_WRITE], data);
 }
 
@@ -157,4 +158,8 @@ bool Command::is_running() {
 
 int Command::get_exit_status() {
   return this->fork_status;
+}
+
+concurrency::SpinLock& Command::get_pipe_lock() {
+  return this->pipe_lock;
 }

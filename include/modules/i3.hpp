@@ -48,10 +48,10 @@ namespace modules
 
     std::unique_ptr<i3ipc::connection> ipc;
 
-    // std::map<i3::Flag, std::unique_ptr<drawtypes::Label>> mode_labels;
     std::map<i3::Flag, std::unique_ptr<drawtypes::Label>> state_labels;
-
     std::vector<std::unique_ptr<i3::Workspace>> workspaces;
+
+    // std::map<i3::Flag, std::unique_ptr<drawtypes::Label>> mode_labels;
     // std::vector<std::unique_ptr<drawtypes::Label>*> modes;
 
     std::unique_ptr<drawtypes::IconMap> icons;

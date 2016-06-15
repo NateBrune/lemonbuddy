@@ -93,7 +93,7 @@ void Builder::append_module_output(Alignment alignment, std::string module_outpu
 
   int margin;
 
-  if (margin_left && (margin= this->opts->module_margin_left) > 0)
+  if (margin_left && (margin = this->opts->module_margin_left) > 0)
     this->output += std::string(margin, ' ');
 
   this->append(module_output);

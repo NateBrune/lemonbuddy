@@ -9,10 +9,9 @@
 #include "drawtypes/icon.hpp"
 #include "drawtypes/label.hpp"
 #include "drawtypes/ramp.hpp"
+#include "lemonbuddy.hpp"
 
 #define DEFAULT_SPACING -1
-
-class Lemonbuddy;
 
 class Builder
 {

@@ -225,4 +225,10 @@ namespace io
   // int set_non_blocking(int fd) {
   //   return fcntl(fd, F_SETFL, io::get_flags(fd) | O_NONBLOCK);
   // }
+
+  void interrupt_read(int write_fd)
+  {
+    char end[1] = {'\n'};
+    log_trace(::write(write_fd, end, 1));
+  }
 }

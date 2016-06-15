@@ -7,6 +7,7 @@
 
 #include "exception.hpp"
 #include "utils/proc.hpp"
+#include "utils/concurrency.hpp"
 
 DefineBaseException(CommandException);
 
@@ -20,6 +21,8 @@ class Command
 
     pid_t fork_pid;
     int fork_status;
+
+    concurrency::SpinLock pipe_lock;
 
   public:
     Command(std::string cmd, int stdout[2] = nullptr, int stdin[2] = nullptr);
@@ -37,4 +40,6 @@ class Command
     pid_t get_pid();
     bool is_running();
     int get_exit_status();
+
+    concurrency::SpinLock& get_pipe_lock();
 };

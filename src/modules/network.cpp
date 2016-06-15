@@ -191,7 +191,7 @@ bool NetworkModule::build(Builder *builder, std::string tag)
   else if (tag == TAG_ANIMATION_PACKETLOSS)
     builder->node(this->animation_packetloss);
   else if (tag == TAG_RAMP_SIGNAL)
-    builder->node(this->ramp_signal, signal_quality);
+    builder->node(this->ramp_signal, float(this->signal_quality()));
   else
     return false;
 

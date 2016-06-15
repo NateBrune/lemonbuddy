@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.1)
 project(lemonbuddy C CXX)
 
 # Include the local cmake modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/modules)
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type specified; using Release")
@@ -15,25 +15,30 @@ endif()
 string(ASCII 27 ANSI)
 
 #
-# Internal values and switches
+# Figure out default option values
 #
-
-# Keep track if the i3 option is explicitly defined
-if(ENABLE_I3)
-  set(ENABLE_I3_NODEF ON)
+find_package(ALSA QUIET)
+find_package(Libiw QUIET)
+find_package(LibMPDClient QUIET)
+find_program(CCACHE_BINARY ccache)
+if(CCACHE_BINARY)
+  set(CCACHE_FOUND ON)
+endif()
+find_program(I3_BINARY i3)
+if(I3_BINARY)
+  set(I3_FOUND ON)
 endif()
 
-option(ENABLE_CCACHE  "Enable ccache support"  ON)
-option(ENABLE_ALSA    "Enable alsa support"    ON)
-option(ENABLE_I3      "Enable i3 support"      ON)
-option(ENABLE_MPD     "Enable mpd support"     ON)
-option(ENABLE_NETWORK "Enable network support" ON)
+option(ENABLE_CCACHE  "Enable ccache support"  ${CCACHE_FOUND})
+option(ENABLE_ALSA    "Enable alsa support"    ${ALSA_FOUND})
+option(ENABLE_I3      "Enable i3 support"      ${I3_FOUND})
+option(ENABLE_MPD     "Enable mpd support"     ${LIBMPDCLIENT_FOUND})
+option(ENABLE_NETWORK "Enable network support" ${LIBIW_FOUND})
 
 if(ENABLE_ALSA)
   set(SETTING_ALSA_SOUNDCARD "default"
     CACHE STRING "Name of the ALSA soundcard driver")
 endif()
-
 set(SETTING_CONNECTION_TEST_IP "8.8.8.8"
   CACHE STRING "Address to ping when testing network connection")
 set(SETTING_PATH_BACKLIGHT_VAL "/sys/class/backlight/%card%/brightness"
@@ -54,85 +59,16 @@ set(SETTING_PATH_MEMORY_INFO "/proc/meminfo"
   CACHE STRING "Path to file containing memory info")
 
 if(ENABLE_CCACHE)
-  find_program(CCACHE_FOUND "ccache")
-  if(CCACHE_FOUND)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "ccache")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "ccache")
-  endif()
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "ccache")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "ccache")
 endif()
 
 #
-# Locate and insert libs
+# Add source tree to the build
 #
-find_package("Boost" REQUIRED)
-find_package("Threads" REQUIRED)
-
-set(PROJECT_INCL_DIRS "${PROJECT_SOURCE_DIR}/include"
-  ${BOOST_INCLUDE_DIR})
-set(PROJECT_LINK_LIBS
-  ${BOOST_LIBRARIES}
-  ${CMAKE_THREAD_LIBS_INIT})
-
-if(ENABLE_I3)
-  find_program(I3_EXECUTABLE "i3")
-  if(NOT I3_EXECUTABLE)
-    if(NOT ENABLE_I3_NODEF)
-      message(WARNING "${ANSI}[41;1mDisabling \"i3 module\" support (prerequisites failed)${ANSI}[0m")
-      set(ENABLE_I3 OFF)
-    endif()
-  endif()
-  if(ENABLE_I3)
-    add_subdirectory("${PROJECT_SOURCE_DIR}/lib/i3ipcpp" EXCLUDE_FROM_ALL)
-    set(PROJECT_INCL_DIRS
-      ${PROJECT_INCL_DIRS}
-      ${SIGCPP_INCLUDE_DIRS}
-      ${I3IPCPP_INCLUDE_DIRS})
-    set(PROJECT_LINK_LIBS
-      ${PROJECT_LINK_LIBS}
-      ${I3IPCPP_LIBRARIES})
-  endif()
-endif()
-
-if(ENABLE_ALSA)
-  find_package("ALSA")
-  if(ALSA_FOUND)
-    set(PROJECT_INCL_DIRS ${PROJECT_INCL_DIRS} ${ALSA_INCLUDE_DIR})
-    set(PROJECT_LINK_LIBS ${PROJECT_LINK_LIBS} ${ALSA_LIBRARY})
-  else(ALSA_FOUND)
-    message(WARNING "${ANSI}[41;1mDisabling \"volume module\" support (prerequisites failed)${ANSI}[0m")
-    set(ENABLE_ALSA OFF)
-  endif()
-endif()
-
-if(ENABLE_MPD)
-  find_package("LibMPDClient")
-  if(LIBMPDCLIENT_FOUND)
-    set(PROJECT_INCL_DIRS ${PROJECT_INCL_DIRS} ${LIBMPDCLIENT_INCLUDE_DIR})
-    set(PROJECT_LINK_LIBS ${PROJECT_LINK_LIBS} ${LIBMPDCLIENT_LIBRARY})
-  else(LIBMPDCLIENT_FOUND)
-    message(WARNING "${ANSI}[41;1mDisabling \"mpd module\" support (prerequisites failed)${ANSI}[0m")
-    set(ENABLE_MPD OFF)
-  endif()
-endif()
-
-if(ENABLE_NETWORK)
-  find_package("Libiw")
-  if(LIBIW_FOUND)
-    set(PROJECT_INCL_DIRS ${PROJECT_INCL_DIRS} ${LIBIW_INCLUDE_DIR})
-    set(PROJECT_LINK_LIBS ${PROJECT_LINK_LIBS} ${LIBIW_LIBRARY})
-  else(LIBIW_FOUND)
-    message(WARNING "${ANSI}[41;1mDisabling \"network module\" support (prerequisites failed)${ANSI}[0m")
-    set(ENABLE_NETWORK OFF)
-  endif()
-endif()
-
-#
-# Load the xpp library
-#
-set(XCB_PROTOS xproto randr)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/xpp")
-set(PROJECT_INCL_DIRS ${PROJECT_INCL_DIRS} ${XPP_INCLUDE_DIRS})
-set(PROJECT_LINK_LIBS ${PROJECT_LINK_LIBS} ${XPP_LIBRARIES})
+add_subdirectory(${PROJECT_SOURCE_DIR}/man)
+add_subdirectory(${PROJECT_SOURCE_DIR}/src ${PROJECT_BINARY_DIR}/bin)
+add_subdirectory(${PROJECT_SOURCE_DIR}/examples ${PROJECT_BINARY_DIR}/examples)
 
 #
 # Execute versioning script
@@ -140,7 +76,7 @@ set(PROJECT_LINK_LIBS ${PROJECT_LINK_LIBS} ${XPP_LIBRARIES})
 execute_process(COMMAND ./version.sh WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_QUIET ERROR_QUIET)
 
 #
-# Install executable and wrapper
+# Build summary
 #
 message(STATUS "---------------------------")
 message(STATUS " Build type: ${CMAKE_BUILD_TYPE}")
@@ -154,54 +90,13 @@ message(STATUS " Enable mpd support     ${ENABLE_MPD}")
 message(STATUS " Enable network support ${ENABLE_NETWORK}")
 message(STATUS "---------------------------")
 
-add_subdirectory("${PROJECT_SOURCE_DIR}/man")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src" EXCLUDE_FROM_ALL)
-link_directories(${PROJECT_LINK_DIRS})
-include_directories(${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR} ${PROJECT_INCL_DIRS})
-link_libraries(${PROJECT_LINK_LIBS})
-
-add_executable(${PROJECT_NAME} ${FILES}
-  "examples/config"
-  "examples/config.bspwm"
-  "examples/config.i3")
-
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 14)
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
-
-target_compile_options(${PROJECT_NAME} PRIVATE
-  -Wall -Wextra -Wpedantic -Wno-unused-parameter
-  $<$<CONFIG:Debug>:-g3 -DDEBUG>
-  $<$<CONFIG:Release>:-O3 -Wno-unused-variable>)
-
-target_link_libraries(${PROJECT_NAME} ${PROJECT_LINK_LIBS})
-
-configure_file("${CMAKE_SOURCE_DIR}/include/config.hpp.cmake" "${CMAKE_SOURCE_DIR}/include/config.hpp" ESCAPE_QUOTES @ONLY)
-
-install(TARGETS ${PROJECT_NAME}
-  DESTINATION "bin"
-  COMPONENT "binaries")
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/lemonbuddy_wrapper"
-  DESTINATION "bin" COMPONENT "binaries")
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/lemonbuddy_terminate"
-  DESTINATION "bin" COMPONENT "binaries")
-
-install(FILES "examples/config"
-  DESTINATION "share/examples/${PROJECT_NAME}"
-  COMPONENT "config")
-install(FILES "examples/config.bspwm"
-  DESTINATION "share/examples/${PROJECT_NAME}"
-  COMPONENT "config")
-install(FILES "examples/config.i3"
-  DESTINATION "share/examples/${PROJECT_NAME}"
-  COMPONENT "config")
-
 #
 # Uninstall target
 #
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/uninstall.cmake"
+  ${PROJECT_SOURCE_DIR}/cmake/uninstall.cmake.in
+  ${PROJECT_BINARY_DIR}/cmake/uninstall.cmake
   IMMEDIATE @ONLY)
 
 add_custom_target(uninstall COMMAND ${CMAKE_COMMAND}
-  -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/uninstall.cmake")
+  -P ${PROJECT_BINARY_DIR}/cmake/uninstall.cmake)

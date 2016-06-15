@@ -11,14 +11,6 @@
 
 DefineBaseException(ConfigurationError);
 
-class Registry;
-
-struct CompiledWithoutModuleSupport : public ConfigurationError
-{
-  explicit CompiledWithoutModuleSupport(std::string module_name)
-    : ConfigurationError(std::string(APP_NAME) + " was not compiled with support for module \""+ module_name +"\"") {}
-};
-
 struct Font
 {
   std::string id;
@@ -62,6 +54,12 @@ struct Options
   int spacing = 1;
   int lineheight = 1;
 
+  int border_top = 0;
+  int border_bottom = 0;
+  std::string border_color = "#000000"; // default border color
+  std::string border_top_color;
+  std::string border_bottom_color;
+
   int padding_left = 0;
   int padding_right = 0;
   int module_margin_left = 0;
@@ -78,6 +76,8 @@ struct Options
   }
 };
 
+class Registry;
+\
 class Bar
 {
   std::string config_path;

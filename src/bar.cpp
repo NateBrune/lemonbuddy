@@ -36,8 +36,14 @@ std::shared_ptr<Bar> get_bar()
 }
 
 std::shared_ptr<Options> bar_opts() {
-  return bar->opts;
+  return get_bar()->opts;
 }
+
+struct CompiledWithoutModuleSupport : public ConfigurationError {
+  explicit CompiledWithoutModuleSupport(std::string module_name)
+    : ConfigurationError(std::string(APP_NAME) + " was not compiled with support for module \""+ module_name +"\"") {}
+};
+
 
 /**
  * Bar constructor
@@ -102,6 +108,12 @@ Bar::Bar() : config_path(config::get_bar_path()), opts(std::make_shared<Options>
   this->opts->background = config::get<std::string>(this->config_path, "background", defaults.background);
   this->opts->foreground = config::get<std::string>(this->config_path, "foreground", defaults.foreground);
   this->opts->linecolor = config::get<std::string>(this->config_path, "linecolor", defaults.linecolor);
+
+  auto border_color = config::get<std::string>(this->config_path, "border-color", defaults.border_color);
+  this->opts->border_top = config::get<int>(this->config_path, "border-top", defaults.border_top);
+  this->opts->border_top_color = config::get<std::string>(this->config_path, "border-top-color", border_color);
+  this->opts->border_bottom = config::get<int>(this->config_path, "border-bottom", defaults.border_bottom);
+  this->opts->border_bottom_color = config::get<std::string>(this->config_path, "border-bottom-color", border_color);
 
   this->opts->bottom = config::get<bool>(this->config_path, "bottom", defaults.bottom);
   this->opts->dock = config::get<bool>(this->config_path, "dock", defaults.dock);
@@ -224,8 +236,12 @@ std::string Bar::get_output()
 
   auto data = builder->flush();
 
-  // return data;
-  return string::replace_all(data, "}%{", " ");
+  data = string::replace_all(data, "}%{", " ");
+  data = string::replace_all(data, "%{l ", "%{l}%{");
+  data = string::replace_all(data, "%{c ", "%{c}%{");
+  data = string::replace_all(data, "%{r ", "%{r}%{");
+  data = string::replace_all(data, "%{r ", "%{r}%{");
+  return data;
 }
 
 

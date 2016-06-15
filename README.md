@@ -100,24 +100,25 @@ available for more people.
 
 ### Dependencies
 
-A C++ compiler with C++14 support. For example [`clang`](http://clang.llvm.org/get_started.html).
+A compiler with c++14 support. For example [`clang`](http://clang.llvm.org/get_started.html).
 
-- lemonbar with xft support _(personally I use [this fork](https://github.com/osense/bar))_
 - cmake
 - boost
 - libxcb
+- freetype2
+- libsigc++-2.0
 
 Optional dependencies for module support:
 
 - wireless_tools (required for `internal/network` support)
 - alsa-lib (required for `internal/volume` support)
 - libmpdclient (required for `internal/mpd` support)
-- jsoncpp, libsigc++ (required for `internal/i3` support)
+- jsoncpp (required for `internal/i3` support)
 
 ~~~ sh
-$ pacman -S cmake boost libxcb wireless_tools alsa-lib libmpdclient jsoncpp libsigc++
-$ xbps-install cmake boost-devel libxcb-devel alsa-lib-devel i3-devel libmpdclient-devel jsoncpp-devel libsigc++-devel wireless_tools-devel
-$ apt-get install cmake libxcb1-dev xcb-proto python-xcbgen libboost-dev libiw-dev libasound2-dev libmpdclient-dev libjsoncpp-dev libsigc++-dev
+$ pacman -S cmake boost libxcb wireless_tools alsa-lib libmpdclient jsoncpp libsigc++ freetype2
+$ xbps-install cmake boost-devel libxcb-devel alsa-lib-devel i3-devel libmpdclient-devel jsoncpp-devel freetype-devel libsigc++-devel wireless_tools-devel
+$ apt-get install cmake libxcb1-dev xcb-proto python-xcbgen libboost-dev libiw-dev libasound2-dev libmpdclient-dev libjsoncpp-dev libsigc++-2.0-dev libfreetype6-dev
 ~~~
 
 
@@ -356,6 +357,14 @@ The configuration syntax is based on the `ini` file format.
   background = #222222
   foreground = #eefafafa
   linecolor = ${bar/example.background}
+
+  ; Border top / bottom
+  ;border-top = 1
+  ;border-top-color = #ff9900
+  ;border-bottom = 2
+  ;border-bottom-color = #ff9900
+  ; This can be used when both colors are the same
+  ;border-color = #ff9900
 
   ; Amount of spaces to add at the start/end of the whole bar
   padding_left = 5

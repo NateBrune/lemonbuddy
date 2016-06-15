@@ -145,8 +145,11 @@ bool BatteryModule::on_event(InotifyEvent *event)
       state = STATE_FULL;
   }
 
-  if (this->state == state && this->percentage == percentage)
+  // check for nullptr since we don't want to ignore the update for the warmup run
+  if (event != nullptr && this->state == state && this->percentage == percentage) {
+    log_trace("Ignore update since values are unchanged");
     return false;
+  }
 
   this->label_charging_tokenized->text = this->label_charging->text;
   this->label_charging_tokenized->replace_token("%percentage%", IntToStr(percentage) + "%");

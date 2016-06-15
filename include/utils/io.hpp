@@ -74,4 +74,6 @@ namespace io
   // int get_flags(int fd);
   // int set_blocking(int fd);
   // int set_non_blocking(int fd);
+
+  void interrupt_read(int write_fd);
 }

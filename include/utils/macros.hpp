@@ -7,7 +7,9 @@
 #define IntToStr(s) std::to_string(s)
 
 #define StrErrno() ToStr(std::strerror(errno))
+#define StrErrnoC() std::strerror(errno)
 #define StrErrnoCustom(s) ToStr(std::strerror(s))
+#define StrErrnoCustomC(s) std::strerror(s)
 
 #define StrSignal(sig) IntToStr(sig)
 #define StrSignalC(sig) strsignal(sig)

@@ -34,7 +34,7 @@ namespace xcb
   typedef struct monitor_t monitor_t;
   struct monitor_t
   {
-    char name[32] = "NONAME";
+    char name[32];
     xcb_rectangle_t bounds;
     int index = 0;
   };

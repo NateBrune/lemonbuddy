@@ -20,7 +20,7 @@ before_install:
   - sudo apt-add-repository -y "ppa:george-edison55/george-edison"
   - sudo sed -i "s/trusty/wily/g" /etc/apt/sources.list
   - sudo apt-get -qq update
-  - sudo apt-get install -y cmake cmake-data libxcb1-dev python-xcbgen xcb-proto libboost-dev libiw-dev libasound2-dev libmpdclient-dev
+  - sudo apt-get install -y cmake cmake-data libxcb1-dev python-xcbgen xcb-proto libboost-dev libiw-dev libasound2-dev libmpdclient-dev libjsoncpp-dev libsigc++-2.0-0v5 libsigc++-2.0-dev libfreetype6-dev
 
 before_script:
   - if [ "$CXX" = "clang++" ]; then export CPPFLAGS="-I $HOME/clang-$LLVM_VERSION/include/c++/v1" CXXFLAGS="-Qunused-arguments"; fi

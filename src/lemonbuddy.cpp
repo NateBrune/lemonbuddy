@@ -25,16 +25,13 @@
  * TODO: Simplify overall flow
  */
 
-std::mutex pid_mtx;
-std::vector<pid_t> pids;
+std::unique_ptr<EventLoop> eventloop;
 
 void register_pid(pid_t pid) {
-  std::lock_guard<std::mutex> lck(pid_mtx);
-  pids.emplace_back(pid);
+  eventloop->register_forked_pid(pid);
 }
 void unregister_pid(pid_t pid) {
-  std::lock_guard<std::mutex> lck(pid_mtx);
-  pids.erase(std::remove(pids.begin(), pids.end(), pid), pids.end());
+  eventloop->unregister_forked_pid(pid);
 }
 
 /**
@@ -44,7 +41,6 @@ int main(int argc, char **argv)
 {
   int retval = EXIT_SUCCESS;
 
-  std::unique_ptr<EventLoop> eventloop;
   std::shared_ptr<Logger> logger = get_logger();
 
   try {
@@ -52,11 +48,11 @@ int main(int argc, char **argv)
 
     cli::add_option("-h", "--help", "Show help options");
     cli::add_option("-c", "--config", "FILE", "Path to the configuration file");
-    cli::add_option("-p", "--pipe", "FILE", "Path to the input pipe");
     cli::add_option("-l", "--log", "LEVEL", "Set the logging verbosity", {"warning","info","debug","trace"});
     cli::add_option("-d", "--dump", "PARAM", "Show value of PARAM in section [bar_name]");
     cli::add_option("-x", "--print-exec", "Print the generated command line string used to start the lemonbar process");
     cli::add_option("-w", "--print-wmname", "Print the generated WM_NAME");
+    cli::add_option("-s", "--stdout", "Output data to stdout instead of creating a bar");
     cli::add_option("-v", "--version", "Print version information");
 
     /**
@@ -171,36 +167,19 @@ int main(int argc, char **argv)
     }
 
     if (cli::has_option("print-exec")) {
-      std::cout << get_bar()->get_exec_line() << std::endl;
+      std::cout << std::make_unique<Bar>()->get_exec_line() << std::endl;
       return EXIT_SUCCESS;
     }
 
     if (cli::has_option("print-wmname")) {
-      std::cout << get_bar()->opts->wm_name << std::endl;
+      std::cout << std::make_unique<Bar>()->opts->wm_name << std::endl;
       return EXIT_SUCCESS;
-    }
-
-    /**
-     * Set path to input pipe file
-     */
-    std::string pipe_file;
-
-    if (cli::has_option("pipe")) {
-      pipe_file = cli::get_option_value("pipe");
-    } else {
-      pipe_file = "/tmp/lemonbuddy.pipe."
-        + get_bar()->opts->wm_name
-        + "."
-        + std::to_string(proc::get_process_id());
-      auto fptr = std::make_unique<io::file::FilePtr>(pipe_file, "a+");
-      if (!*fptr)
-        throw ApplicationError(StrErrno());
     }
 
     /**
      * Create and start the main event loop
      */
-    eventloop = std::make_unique<EventLoop>(pipe_file);
+    eventloop = std::make_unique<EventLoop>(cli::has_option("stdout"));
 
     eventloop->start();
     eventloop->wait();
@@ -210,21 +189,10 @@ int main(int argc, char **argv)
     retval = EXIT_FAILURE;
   }
 
-  if (eventloop)
+  if (eventloop) {
     eventloop->stop();
-
-  /**
-   * Terminate forked sub processes
-   */
-  if (!pids.empty()) {
-    logger->info("Terminating "+ IntToStr(pids.size()) +" spawned process"+ (pids.size() > 1 ? "es" : ""));
-
-    for (auto &&pid : pids)
-      proc::kill(pid, SIGKILL);
-  }
-
-  if (eventloop)
     eventloop->cleanup();
+  }
 
   while (proc::wait_for_completion_nohang() > 0)
     ;
